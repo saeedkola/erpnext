@@ -48,6 +48,45 @@ class BankClearance(Document):
 			as_dict=1,
 		)
 
+		pos_sales_invoices, pos_purchase_invoices = [], []
+		if self.include_pos_transactions:
+			pos_sales_invoices = frappe.db.sql(
+				"""
+				select
+					"Sales Invoice" as payment_document,
+					sip.cheque_reference_no as cheque_number, 
+					si.name as payment_entry,sip.name as payment_line, sip.amount as debit,
+					si.posting_date, si.customer as against_account, sip.clearance_date,
+					account.account_currency, 0 as credit
+				from `tabSales Invoice Payment` sip, `tabSales Invoice` si, `tabAccount` account
+				where
+					sip.account=%(account)s and si.docstatus=1 and sip.parent = si.name
+					and account.name = sip.account and si.posting_date >= %(from)s and si.posting_date <= %(to)s
+					{condition}
+				order by
+					si.posting_date ASC, si.name DESC 
+			""".format(condition=condition),
+				{"account": self.account, "from": self.from_date, "to": self.to_date},
+				as_dict=1,
+			)
+
+		pos_purchase_invoices = frappe.db.sql(
+			"""
+			select
+				"Purchase Invoice" as payment_document, pi.name as payment_entry, pi.paid_amount as credit,
+				pi.posting_date, pi.supplier as against_account, pi.clearance_date,
+				account.account_currency, 0 as debit
+			from `tabPurchase Invoice` pi, `tabAccount` account
+			where
+				pi.cash_bank_account=%(account)s and pi.docstatus=1 and account.name = pi.cash_bank_account
+				and pi.posting_date >= %(from)s and pi.posting_date <= %(to)s
+			order by
+				pi.posting_date ASC, pi.name DESC
+		""",
+			{"account": self.account, "from": self.from_date, "to": self.to_date},
+			as_dict=1,
+		)		
+
 		if self.bank_account:
 			condition += "and bank_account = %(bank_account)s"
 
@@ -126,44 +165,6 @@ class BankClearance(Document):
 			.orderby(loan_repayment.name, frappe.qb.desc)
 		).run(as_dict=1)
 
-		pos_sales_invoices, pos_purchase_invoices = [], []
-		if self.include_pos_transactions:
-			pos_sales_invoices = frappe.db.sql(
-				"""
-				select
-					"Sales Invoice" as payment_document,
-					sip.cheque_reference_no as cheque_number, 
-					si.name as payment_entry,sip.name as payment_line, sip.amount as debit,
-					si.posting_date, si.customer as against_account, sip.clearance_date,
-					account.account_currency, 0 as credit
-				from `tabSales Invoice Payment` sip, `tabSales Invoice` si, `tabAccount` account
-				where
-					sip.account=%(account)s and si.docstatus=1 and sip.parent = si.name
-					and account.name = sip.account and si.posting_date >= %(from)s and si.posting_date <= %(to)s
-					{condition}
-				order by
-					si.posting_date ASC, si.name DESC 
-			""".format(condition=condition),
-				{"account": self.account, "from": self.from_date, "to": self.to_date},
-				as_dict=1,
-			)
-
-			pos_purchase_invoices = frappe.db.sql(
-				"""
-				select
-					"Purchase Invoice" as payment_document, pi.name as payment_entry, pi.paid_amount as credit,
-					pi.posting_date, pi.supplier as against_account, pi.clearance_date,
-					account.account_currency, 0 as debit
-				from `tabPurchase Invoice` pi, `tabAccount` account
-				where
-					pi.cash_bank_account=%(account)s and pi.docstatus=1 and account.name = pi.cash_bank_account
-					and pi.posting_date >= %(from)s and pi.posting_date <= %(to)s
-				order by
-					pi.posting_date ASC, pi.name DESC
-			""",
-				{"account": self.account, "from": self.from_date, "to": self.to_date},
-				as_dict=1,
-			)
 
 		entries = sorted(
 			list(payment_entries)
