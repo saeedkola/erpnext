@@ -140,9 +140,10 @@ class BankClearance(Document):
 				where
 					sip.account=%(account)s and si.docstatus=1 and sip.parent = si.name
 					and account.name = sip.account and si.posting_date >= %(from)s and si.posting_date <= %(to)s
+					{condition}
 				order by
-					si.posting_date ASC, si.name DESC
-			""",
+					si.posting_date ASC, si.name DESC 
+			""".format(condition=condition),
 				{"account": self.account, "from": self.from_date, "to": self.to_date},
 				as_dict=1,
 			)
