@@ -131,7 +131,9 @@ class BankClearance(Document):
 			pos_sales_invoices = frappe.db.sql(
 				"""
 				select
-					"Sales Invoice Payment" as payment_document, sip.name as payment_entry, sip.amount as debit,
+					"Sales Invoice" as payment_document,
+					sip.cheque_reference_no as cheque_number, 
+					si.name as payment_entry,sip.name as payment_line, sip.amount as debit,
 					si.posting_date, si.customer as against_account, sip.clearance_date,
 					account.account_currency, 0 as credit
 				from `tabSales Invoice Payment` sip, `tabSales Invoice` si, `tabAccount` account
@@ -212,8 +214,10 @@ class BankClearance(Document):
 			if d.clearance_date or self.include_reconciled_entries:
 				if not d.clearance_date:
 					d.clearance_date = None
-
-				payment_entry = frappe.get_doc(d.payment_document, d.payment_entry)
+				if d.payment_document == "Sales Invoice":
+					payment_entry = frappe.get_doc("Sales Invoice Payment", d.payment_line)	
+				else:
+					payment_entry = frappe.get_doc(d.payment_document, d.payment_entry)
 				payment_entry.db_set("clearance_date", d.clearance_date)
 
 				clearance_date_updated = True
