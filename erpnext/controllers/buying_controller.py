@@ -718,6 +718,7 @@ class BuyingController(StockController, Subcontracting):
 				"gross_purchase_amount": purchase_amount,
 				"purchase_receipt": self.name if self.doctype == "Purchase Receipt" else None,
 				"purchase_invoice": self.name if self.doctype == "Purchase Invoice" else None,
+				"cost_center": row.cost_center if row.cost_center else None			
 			}
 		)
 
