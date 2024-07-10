@@ -710,6 +710,10 @@ class BuyingController(StockController, Subcontracting):
 				"naming_series": item_data.get("asset_naming_series") or "AST",
 				"asset_category": item_data.get("asset_category"),
 				"location": row.asset_location,
+				"asset_type": row.asset_type,
+				"office": row.office,
+				"section": row.section,
+				"serial_number": row.serial_number,
 				"company": self.company,
 				"supplier": self.supplier,
 				"purchase_date": self.posting_date,
@@ -719,6 +723,7 @@ class BuyingController(StockController, Subcontracting):
 				"purchase_receipt": self.name if self.doctype == "Purchase Receipt" else None,
 				"purchase_invoice": self.name if self.doctype == "Purchase Invoice" else None,
 				"cost_center": row.cost_center if row.cost_center else None			
+
 			}
 		)
 
