@@ -399,6 +399,7 @@ def make_reverse_gl_entries(
 		validate_accounting_period(gl_entries)
 		check_freezing_date(gl_entries[0]["posting_date"], adv_adj)
 		set_as_cancel(gl_entries[0]["voucher_type"], gl_entries[0]["voucher_no"])
+		from frappe.utils import today
 
 		for entry in gl_entries:
 			entry["name"] = None
@@ -415,6 +416,8 @@ def make_reverse_gl_entries(
 
 			entry["remarks"] = "On cancellation of " + entry["voucher_no"]
 			entry["is_cancelled"] = 1
+
+			entry['posting_date'] = today()
 
 			if entry["debit"] or entry["credit"]:
 				make_entry(entry, adv_adj, "Yes")
