@@ -242,14 +242,14 @@ def set_address_details(
 			)
 
 			# shipping address - if not already set
-			if not party_details.shipping_address:
-				party_details.update(
-					{
-						"shipping_address": party_details.billing_address,
-						"shipping_address_display": party_details.billing_address_display,
-						**get_fetch_values(doctype, "shipping_address", party_details.billing_address),
-					}
-				)
+			# if not party_details.shipping_address:
+			# 	party_details.update(
+			# 		{
+			# 			"shipping_address": party_details.billing_address,
+			# 			"shipping_address_display": party_details.billing_address_display,
+			# 			**get_fetch_values(doctype, "shipping_address", party_details.billing_address),
+			# 		}
+			# 	)
 
 		get_regional_address_details(party_details, doctype, company)
 
