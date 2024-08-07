@@ -549,7 +549,8 @@ def get_disposal_account_and_cost_center(company):
 			_("Please set 'Gain/Loss Account on Asset Disposal' in Company {0}").format(company)
 		)
 	if not depreciation_cost_center:
-		frappe.throw(_("Please set 'Asset Depreciation Cost Center' in Company {0}").format(company))
+		pass
+		#frappe.throw(_("Please set 'Asset Depreciation Cost Center' in Company {0}").format(company))
 
 	return disposal_account, depreciation_cost_center
 
