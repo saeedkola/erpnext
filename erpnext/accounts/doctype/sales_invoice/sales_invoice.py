@@ -1118,8 +1118,11 @@ class SalesInvoice(SellingController):
 
 					else:
 						if asset.calculate_depreciation:
-							# depreciate_asset(asset, self.posting_date)
-							asset.reload()
+							asset.flags.ignore_validate_update_after_submit = True
+							asset.clear_depreciation_schedule()
+							asset.save()
+							#depreciate_asset(asset, self.posting_date)
+							# asset.reload()
 
 						fixed_asset_gl_entries = get_gl_entries_on_asset_disposal(
 							asset, item.base_net_amount, item.finance_book, self.posting_date
