@@ -1005,7 +1005,7 @@ def get_children(doctype, parent, company, is_root=False):
 
 	acc = frappe.get_list(doctype, fields=fields, filters=filters)
 
-	if doctype == "Account":
+	if doctype == "Account" or doctype == 'Cost Center':
 		sort_accounts(acc, is_root, key="value")
 
 	return acc
