@@ -465,7 +465,7 @@ cur_frm.cscript.expense_account = function(doc, cdt, cdn){
 	if(d.idx == 1 && d.expense_account){
 		var cl = doc.items || [];
 		for(var i = 0; i < cl.length; i++){
-			if(!cl[i].expense_account) cl[i].expense_account = d.expense_account;
+			// if(!cl[i].expense_account) cl[i].expense_account = d.expense_account;
 		}
 	}
 	refresh_field('items');
