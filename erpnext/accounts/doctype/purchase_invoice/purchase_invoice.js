@@ -372,8 +372,8 @@ erpnext.accounts.PurchaseInvoice = erpnext.buying.BuyingController.extend({
 
 	items_add: function(doc, cdt, cdn) {
 		var row = frappe.get_doc(cdt, cdn);
-		// this.frm.script_manager.copy_from_first_row("items", row,
-		// 	["expense_account", "discount_account", "cost_center", "project"]);
+		this.frm.script_manager.copy_from_first_row("items", row,
+			["expense_account", "discount_account", "cost_center", "project"]);
 	},
 
 	on_submit: function() {
@@ -465,7 +465,7 @@ cur_frm.cscript.expense_account = function(doc, cdt, cdn){
 	if(d.idx == 1 && d.expense_account){
 		var cl = doc.items || [];
 		for(var i = 0; i < cl.length; i++){
-			// if(!cl[i].expense_account) cl[i].expense_account = d.expense_account;
+			if(!cl[i].expense_account) cl[i].expense_account = d.expense_account;
 		}
 	}
 	refresh_field('items');
