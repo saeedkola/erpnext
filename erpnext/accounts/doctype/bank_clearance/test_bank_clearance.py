@@ -2,7 +2,7 @@
 # See license.txt
 
 import frappe
-from frappe.utils import add_months, getdate
+from frappe.utils import add_days, add_months, getdate
 
 from erpnext.accounts.doctype.mode_of_payment.test_mode_of_payment import (
 	set_default_account_for_mode_of_payment,
@@ -109,6 +109,68 @@ class TestBankClearance(ERPNextTestSuite):
 
 		self.assertEqual(si_clearance_date, date)
 
+	def test_unchanged_rows_are_not_validated_or_logged(self):
+		date = getdate()
+
+		# clearance date stamped outside Bank Clearance (e.g. by the Bank
+		# Reconciliation Tool, which has no cheque date check) that violates
+		# the clearance-after-cheque-date rule
+		reconciled_pe = make_payment_entry(reference_date=date, clearance_date=add_days(date, -5))
+		edited_pe = make_payment_entry(reference_date=add_days(date, -10))
+
+		comments_before = frappe.db.count(
+			"Comment",
+			{"reference_doctype": "Payment Entry", "reference_name": reconciled_pe.name},
+		)
+
+		bank_clearance = frappe.get_doc("Bank Clearance")
+		bank_clearance.account = "_Test Bank Clearance - _TC"
+		bank_clearance.from_date = add_months(date, -1)
+		bank_clearance.to_date = date
+		bank_clearance.include_reconciled_entries = 1
+		bank_clearance.get_payment_entries()
+
+		for payment in bank_clearance.payment_entries:
+			if payment.payment_entry == edited_pe.name:
+				payment.clearance_date = date
+
+		bank_clearance.update_clearance_date()
+
+		# the edited row is updated even though an untouched row holds a
+		# clearance date before its cheque date
+		self.assertEqual(frappe.db.get_value("Payment Entry", edited_pe.name, "clearance_date"), date)
+
+		# the untouched row is neither re-written nor commented on again
+		self.assertEqual(
+			frappe.db.get_value("Payment Entry", reconciled_pe.name, "clearance_date"),
+			add_days(date, -5),
+		)
+		self.assertEqual(
+			frappe.db.count(
+				"Comment",
+				{"reference_doctype": "Payment Entry", "reference_name": reconciled_pe.name},
+			),
+			comments_before,
+		)
+
+	def test_clearance_date_before_cheque_date_is_rejected(self):
+		date = getdate()
+		pe = make_payment_entry(reference_date=date)
+
+		bank_clearance = frappe.get_doc("Bank Clearance")
+		bank_clearance.account = "_Test Bank Clearance - _TC"
+		bank_clearance.from_date = add_months(date, -1)
+		bank_clearance.to_date = date
+		bank_clearance.get_payment_entries()
+
+		for payment in bank_clearance.payment_entries:
+			if payment.payment_entry == pe.name:
+				payment.clearance_date = add_days(date, -5)
+
+		bank_clearance.update_clearance_date()
+
+		self.assertIsNone(frappe.db.get_value("Payment Entry", pe.name, "clearance_date"))
+
 
 def make_bank_account():
 	if not frappe.db.get_value("Account", "_Test Bank Clearance - _TC"):
@@ -127,7 +189,7 @@ def add_transactions():
 	make_payment_entry()
 
 
-def make_payment_entry():
+def make_payment_entry(reference_date="2018-10-24", clearance_date=None):
 	pi = make_purchase_invoice(
 		supplier="_Test Supplier",
 		supplier_warehouse="_Test Warehouse - _TC",
@@ -138,9 +200,14 @@ def make_payment_entry():
 	)
 	pe = get_payment_entry("Purchase Invoice", pi.name, bank_account="_Test Bank Clearance - _TC")
 	pe.reference_no = "Conrad Oct 18"
-	pe.reference_date = "2018-10-24"
+	pe.reference_date = reference_date
 	pe.insert()
 	pe.submit()
+
+	if clearance_date:
+		pe.db_set("clearance_date", clearance_date)
+
+	return pe
 
 
 def make_pos_sales_invoice():

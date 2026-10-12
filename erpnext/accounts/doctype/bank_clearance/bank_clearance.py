@@ -96,24 +96,47 @@ class BankClearance(Document):
 		entries_to_update = []
 		self.check_permission("write")
 
-		def validate_entry(d):
-			is_valid = True
+		def get_current_clearance_date(d):
+			if d.payment_document == "Sales Invoice":
+				return frappe.db.get_value(
+					"Sales Invoice Payment",
+					{
+						"parent": d.payment_entry,
+						"account": self.account,
+						"amount": [">", 0],
+					},
+					"clearance_date",
+				)
+
+			return frappe.db.get_value(d.payment_document, d.payment_entry, "clearance_date")
+
+		for d in self.get("payment_entries"):
+			if not (d.clearance_date or self.include_reconciled_entries):
+				continue
+
 			if not d.payment_document:
 				invalid_document.append(str(d.idx))
-				is_valid = False
+				continue
+
+			if not d.clearance_date:
+				d.clearance_date = None
+
+			old_clearance_date = get_current_clearance_date(d)
+
+			# only rows whose clearance date actually changed are part of the update;
+			# stored dates stamped outside this tool (e.g. by the Bank Reconciliation
+			# Tool, which has no cheque date check) must neither fail validation nor
+			# get a repeat audit comment (#55322)
+			if (getdate(d.clearance_date) if d.clearance_date else None) == (
+				getdate(old_clearance_date) if old_clearance_date else None
+			):
+				continue
 
 			if d.clearance_date and d.cheque_date and getdate(d.clearance_date) < getdate(d.cheque_date):
 				invalid_cheque_date.append(str(d.idx))
-				is_valid = False
+				continue
 
-			return is_valid
-
-		for d in self.get("payment_entries"):
-			if validate_entry(d) and (d.clearance_date or self.include_reconciled_entries):
-				if not d.clearance_date:
-					d.clearance_date = None
-
-				entries_to_update.append(d)
+			entries_to_update.append((d, old_clearance_date))
 
 		if invalid_document or invalid_cheque_date:
 			msg = _("<p>Please correct the following row(s):</p><ul>")
@@ -135,46 +158,26 @@ class BankClearance(Document):
 			msgprint(_("Clearance Date not mentioned"))
 			return
 
-		for d in entries_to_update:
+		for d, old_clearance_date in entries_to_update:
 			if d.payment_document == "Sales Invoice":
-				old_clearance_date = frappe.db.get_value(
+				frappe.db.set_value(
 					"Sales Invoice Payment",
-					{
-						"parent": d.payment_entry,
-						"account": self.account,
-						"amount": [">", 0],
-					},
+					{"parent": d.payment_entry, "account": self.get("account"), "amount": [">", 0]},
 					"clearance_date",
+					d.clearance_date,
 				)
-				if d.clearance_date or old_clearance_date:
-					frappe.db.set_value(
-						"Sales Invoice Payment",
-						{"parent": d.payment_entry, "account": self.get("account"), "amount": [">", 0]},
-						"clearance_date",
-						d.clearance_date,
-					)
-					sales_invoice = frappe.get_lazy_doc("Sales Invoice", d.payment_entry)
-					sales_invoice.add_comment(
-						"Comment",
-						_("Clearance date changed from {0} to {1} via Bank Clearance Tool").format(
-							old_clearance_date, d.clearance_date
-						),
-					)
-
+				voucher = frappe.get_lazy_doc("Sales Invoice", d.payment_entry)
 			else:
-				payment_entry = frappe.get_lazy_doc(d.payment_document, d.payment_entry)
-				old_clearance_date = payment_entry.clearance_date
+				voucher = frappe.get_lazy_doc(d.payment_document, d.payment_entry)
+				# using db_set to trigger notification
+				voucher.db_set("clearance_date", d.clearance_date)
 
-				if d.clearance_date or old_clearance_date:
-					# using db_set to trigger notification
-					payment_entry.db_set("clearance_date", d.clearance_date)
-
-					payment_entry.add_comment(
-						"Comment",
-						_("Clearance date changed from {0} to {1} via Bank Clearance Tool").format(
-							old_clearance_date, d.clearance_date
-						),
-					)
+			voucher.add_comment(
+				"Comment",
+				_("Clearance date changed from {0} to {1} via Bank Clearance Tool").format(
+					old_clearance_date, d.clearance_date
+				),
+			)
 
 		self.get_payment_entries()
 		msgprint(_("Clearance Date updated"))
